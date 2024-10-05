@@ -62,7 +62,7 @@ class Booth:
         self.state = state
         self.queue_state = queue_state
 
-    def is_running(self):
+    def is_processing(self):
         return self.state == BoothState.RUNNING
 
     def is_paused(self):
@@ -135,7 +135,8 @@ class Booth:
         """ Build and return event dict """
         vehicle_dict = vehicle.to_dict()
         event = {"event_type": booth_event,
-                 "timestamp": datetime.now().isoformat()}
+                 "timestamp": datetime.now().isoformat(),
+                 "booth_id": self.booth_id}
         event.update(vehicle_dict)
 
         return event
@@ -181,7 +182,7 @@ class Booth:
 
     def process_vehicles(self):
         """Process vehicle continuoulsy"""
-        while self.is_running():
+        while self.is_processing():
             if self.is_paused():
                 logger.info(
                     "Booth %d is paused. No processing will occur.",

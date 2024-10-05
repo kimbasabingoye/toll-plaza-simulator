@@ -1,10 +1,9 @@
-import time
-from vehicle import VehicleType, PlateNumber, Vehicle
-from booth import Booth, BoothState
-from thread_manager import ThreadManager
 import threading
 import logging
 from typing import Optional
+
+from vehicle import Vehicle
+from booth import Booth, BoothState
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -20,7 +19,7 @@ class BoothManager:
             processing_speed (float): The speed at which the booth processes vehicles.
         """
         self.booth = Booth(booth_id, processing_speed)
-        self.thread = None
+        self.thread: Optional[threading.Thread] = None
         self.running = False
 
     def start_booth(self):
@@ -38,7 +37,8 @@ class BoothManager:
         """Stop the booth's processing and terminate the thread."""
         if self.running:
             self.booth.set_booth_state(BoothState.STOPPED)
-            self.thread.join()  # Wait for the thread to finish
+            if self.thread:
+                self.thread.join()  # Wait for the thread to finish
             self.running = False
             logger.info("Booth %d has stopped processing.",
                         self.booth.booth_id)
@@ -66,22 +66,10 @@ class BoothManager:
         """Close the booth's queue to stop accepting new vehicles."""
         self.booth.close_queue()
 
-    def add_vehicle(self, vehicle: Vehicle):
+    def add_vehicle(self, vehicle: Vehicle)->  bool:
         """Add a vehicle to the booth's queue."""
         if not self.booth.add_vehicle(vehicle):
             logger.info("Booth %d could not add vehicle %s.",
                         self.booth.booth_id, vehicle.plate_number)
-
-
-booth = BoothManager(booth_id=1, processing_speed=2)
-
-booth.start_booth()
-
-v1 = Vehicle(plate_number=PlateNumber("AA 1234"), vehicle_type=VehicleType.CAR)
-v2 = Vehicle(plate_number=PlateNumber("AA 1235"), vehicle_type=VehicleType.TRUCK)
-
-booth.add_vehicle(v1)
-booth.add_vehicle(v2)
-
-time.sleep(10)
-booth.stop_booth()
+            return False
+        return True
