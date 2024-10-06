@@ -1,32 +1,42 @@
-import time
+import os
+import logging
+from dotenv import load_dotenv
 
-from toll_plaza_manager import TollPlazaManager
-from  booth_manager import BoothManager
-from vehicle import Vehicle, PlateNumber, VehicleType, VehicleFactory
-from traffic_generator import TrafficGenerator
+from traffic_management.booth import Booth
+from traffic_management.traffic_generator import TrafficGenerator
+from toll_plaza_management.toll_plaza import TollPlaza
+from toll_plaza_management.toll_plazas_controller import TollPlazasController
 
-NUM_VEHICLE = 100
 
-traffic = TrafficGenerator(100)
+load_dotenv()
 
-# Create some Booth instances
-booth1 = BoothManager(booth_id=1, processing_speed=2)
-booth2 = BoothManager(booth_id=2, processing_speed=3)
-booth3 = BoothManager(booth_id=3, processing_speed=1)
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-# Pass the list of BoothManager instances to the TollPlazaManager
-toll_plaza = TollPlazaManager(1, booths=[booth1, booth2, booth3])
 
-# Start the toll plaza
-toll_plaza.start_plaza()
 
-for _ in range(NUM_VEHICLE):
-    veh = VehicleFactory.generate_random_vehicle()
-    toll_plaza.add_vehicle(veh, toll_plaza.random_booth_strategy)
-    time.sleep(1)
+def main():
+    num_vehicles = int(os.getenv("NUM_VEHICLE", '0'))
 
-# Let it run for a while
-time.sleep(10)
+    booth11 = Booth("1-1")
+    booth12 = Booth("1-2")
+    plaza1 = TollPlaza(plaza_id=1, booths=[booth11, booth12])
 
-# Stop the toll plaza
-toll_plaza.stop_plaza()
+    booth21 = Booth("2-1")
+    booth22 = Booth("2-2")
+    plaza2 = TollPlaza(plaza_id=2, booths=[booth21, booth22])
+
+    plazas_controller = TollPlazasController([plaza1, plaza2])
+
+    traffic_generator = TrafficGenerator(plazas_controller, num_vehicles)
+    traffic_generator = TrafficGenerator(plazas_controller, 0)
+
+    try:
+        traffic_generator.generate_vehicle_flow()
+    except KeyboardInterrupt:
+        logger.info("Vehicle generation interrupted. Exiting...")
+        plazas_controller.stop_controller()  # Gracefully stop all plazas
+
+
+if __name__ == "__main__":
+    main()

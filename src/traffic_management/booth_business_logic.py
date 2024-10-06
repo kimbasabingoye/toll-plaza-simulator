@@ -8,7 +8,7 @@ from typing import Dict, Any, Optional
 
 from dotenv import load_dotenv
 
-from vehicle import Vehicle
+from traffic_management.vehicle import Vehicle
 
 load_dotenv()
 
@@ -16,6 +16,13 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 BOTH_QUEUE_MAX_SIZE = int(os.getenv("BOTH_QUEUE_MAX_SIZE", "10"))
+
+
+class AddVehiculeReturnCode(int, enum.Enum):
+    """Error codes for adding vehicle"""
+    QUEUE_FULL = 1
+    QUEUE_CLOSED = 2
+    QUEUE_VEHICULE_ADDED = 0
 
 
 class BoothEventType(str, enum.Enum):
@@ -31,19 +38,19 @@ class BoothState(str, enum.Enum):
     PAUSED = 'paused'
     RUNNING = 'running'
 
+
 class BoothQueueState(str, enum.Enum):
     """Class representing booth's queue state"""
     OPEN = 'open'
     CLOSED = 'closed'
 
 
-class Booth:
+class BoothBusinessLogic:
     """Represents a booth in a toll plaza."""
 
     def __init__(self,
-                 booth_id: int,
-                 processing_speed: int = 1,
-                 state: BoothState = BoothState.RUNNING,
+                 booth_id: str,
+                 processing_speed: float = 1,
                  queue_length: int = BOTH_QUEUE_MAX_SIZE,
                  queue_state: BoothQueueState = BoothQueueState.OPEN,
                  ):
@@ -59,17 +66,7 @@ class Booth:
         self.current_vehicle: Optional[Vehicle] = None
         self.vehicle_queue = Queue(queue_length)
         self.processing_speed = processing_speed
-        self.state = state
         self.queue_state = queue_state
-
-    def is_processing(self):
-        return self.state == BoothState.RUNNING
-
-    def is_paused(self):
-        return self.state == BoothState.PAUSED
-
-    def is_stopped(self):
-        return self.state == BoothState.STOPPED
 
     def is_busy(self) -> bool:
         """ Return True if the booth is busy and False if not """
@@ -92,22 +89,19 @@ class Booth:
     def set_queue_state(self, new_state):
         self.queue_state = new_state
 
-    def set_booth_state(self, state):
-        self.state = state
-
-    def open_queue(self) -> None:
+    def open_queue_logic(self) -> None:
         """Open the booth and start accepting vehicles."""
         self.set_queue_state(BoothQueueState.OPEN)
-        logger.info("Booth %d queue is now open to new vehicles.",
+        logger.info("Booth %s queue is now open to new vehicles.",
                     self.booth_id)
 
-    def close_queue(self) -> None:
+    def close_queue_logic(self) -> None:
         """Close the booth and stop accepting new vehicles."""
         self.set_queue_state(BoothQueueState.CLOSED)
-        logger.info("Booth %d queue is now closed to new vehicles.",
+        logger.info("Booth %s queue is now closed to new vehicles.",
                     self.booth_id)
 
-    def add_vehicle(self, new_vehicle: Vehicle) -> bool:
+    def enqueue_vehicle(self, new_vehicle: Vehicle) -> int:
         """
         Adds a vehicle to the processing queue of the booth if it's not full 
         and the booth is open.
@@ -118,17 +112,17 @@ class Booth:
             bool: True if the vehicle is added, False otherwise
         """
         if self.queue_state == BoothQueueState.CLOSED:
-            logger.info("Booth %d queue is closed. Cannot add vehicle %d.",
+            logger.info("Booth %s queue is closed. Cannot add vehicle %s.",
                         self.booth_id, new_vehicle.plate_number)
-            return False
+            return AddVehiculeReturnCode.QUEUE_CLOSED
 
         if self.queue_is_full():
-            logger.info("Booth %d: Queue is full. Cannot add vehicle %d.",
+            logger.info("Booth %s: Queue is full. Cannot add vehicle %s.",
                         self.booth_id, new_vehicle.plate_number)
-            return False
+            return AddVehiculeReturnCode.QUEUE_FULL
 
         self.vehicle_queue.put(new_vehicle)
-        return True
+        return AddVehiculeReturnCode.QUEUE_VEHICULE_ADDED
 
     def get_event(self, vehicle: Vehicle,
                   booth_event: BoothEventType) -> Dict[str, Any]:
@@ -148,8 +142,10 @@ class Booth:
         """
         if not self.is_busy() and not self.queue_is_empty():
             self.current_vehicle = self.vehicle_queue.get()
-            logger.info("Booth %d is now processing the vehicle %s.",
-                        self.booth_id, self.current_vehicle.plate_number.plate_number)
+            if self.current_vehicle:
+                logger.info("Booth %s is now processing the vehicle %s.",
+                            self.booth_id,
+                            self.current_vehicle.plate_number.plate_number)
             return True
         return False
 
@@ -180,18 +176,3 @@ class Booth:
 
         return True
 
-    def process_vehicles(self):
-        """Process vehicle continuoulsy"""
-        while self.is_processing():
-            if self.is_paused():
-                logger.info(
-                    "Booth %d is paused. No processing will occur.",
-                    self.booth_id)
-                time.sleep(1)  # Wait before checking again
-            elif self._set_next_vehicle_to_process():
-                self.process_current_vehicle()
-                time.sleep(0.5)
-            else:
-                logger.info(
-                    "Booth %d is idle. No vehicles to process.", self.booth_id)
-                time.sleep(1)  # Wait before checking again

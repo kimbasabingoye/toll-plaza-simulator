@@ -1,11 +1,10 @@
 """Vehcile class"""
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
-from datetime import datetime
 import re
 import random
-from typing import Optional, Dict, Any
+from typing import Dict, Any
 
 
 class VehicleType(str, Enum):
@@ -18,15 +17,15 @@ class VehicleType(str, Enum):
 class PlateNumber:
     """Class representing a vehicle plate number"""
 
-    def __init__(self, plate_number: str):
-        if not self.is_valid(plate_number):
+    def __init__(self, plate_number: str, regex_pattern: str = r"^[A-Z]{2} \d{4}$"):
+        if not self.is_valid(plate_number, regex_pattern):
             raise ValueError(f"Invalid plate number: {plate_number}")
         self.plate_number = plate_number
 
     @staticmethod
-    def is_valid(plate_number: str) -> bool:
-        """Check the validity of a plate_number"""
-        return bool(re.match(r"^[A-Z]{2} \d{4}$", plate_number))
+    def is_valid(plate_number: str, regex_pattern: str) -> bool:
+        """Check the validity of a plate number."""
+        return bool(re.match(regex_pattern, plate_number))
 
     def __str__(self):
         return self.plate_number
@@ -39,18 +38,13 @@ class Vehicle:
     """
     plate_number: PlateNumber
     vehicle_type: VehicleType
-    #entry_time: str
-    #processed_time: Optional[str] = field(init=False, default=None)
 
     def __repr__(self):
         """
         Returns a string representation of the vehicle.
         """
         return (f"Vehicle(plate_number={self.plate_number}, "
-                f"vehicle_type={self.vehicle_type}, "
-                #f"entry_time={self.entry_time}, "
-                #f"processed_time={self.processed_time})"
-                )
+                f"vehicle_type={self.vehicle_type}, ")
 
 
     def to_dict(self) -> Dict[str, Any]:
@@ -60,8 +54,6 @@ class Vehicle:
         return {
             "plate_number": self.plate_number.plate_number,
             "vehicle_type": self.vehicle_type.value,
-            #"entry_time": self.entry_time,
-            #"processed_time": self.processed_time
         }
 
 
@@ -81,10 +73,8 @@ class VehicleFactory:
             Vehicle: An instance of the Vehicle class.
         """
         plate_number = PlateNumber(plate_number_str)
-        #entry_time = datetime.now().isoformat()
         return Vehicle(plate_number=plate_number,
                        vehicle_type=vehicle_type,
-                       #entry_time=entry_time
                     )
 
     @staticmethod
