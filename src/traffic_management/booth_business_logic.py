@@ -4,6 +4,7 @@ import enum
 import logging
 import datetime
 from queue import Queue
+import random
 from typing import Optional
 
 from dotenv import load_dotenv
@@ -166,29 +167,38 @@ class BoothBusinessLogic:
             return True
         return False
 
+    def get_processing_delay(self):
+        """Define the range for random delays (in seconds)"""
+        min_delay = self.processing_speed / 3  # Minimum delay
+        max_delay = self.processing_speed * 3  # Maximum delay
+
+        return random.uniform(min_delay, max_delay)
+
+
     def process_current_vehicle(self, messaging_system: message_sender.MessageSender) -> bool:
         """Simulate processing the curent vehicle."""
         if self.current_vehicle is None:
             logger.info("No vehicle to process")
             return False
 
+        # Process entrance event
         event = self.get_booth_event(
             self.current_vehicle, BoothEventType.ENTER)
-        time.sleep(self.processing_speed / 3)
+        time.sleep(self.get_processing_delay())
         messaging_system.send_message(f"{event}")
-        # logger.info("Publishing entrance event: %s", entrance_message)
+        logger.info("Publishing entrance event: %s", event)
 
-        event = self.get_booth_event(
-            self.current_vehicle, BoothEventType.PAY)
-        time.sleep(self.processing_speed / 3)
+        # Process payment event
+        event = self.get_booth_event(self.current_vehicle, BoothEventType.PAY)
+        time.sleep(self.get_processing_delay())
         messaging_system.send_message(f"{event}")
-        # logger.info("Publishing payment event: %s", payment_message)
+        logger.info("Publishing payment event: %s", event)
 
-        event = self.get_booth_event(
-            self.current_vehicle, BoothEventType.EXIT)
-        time.sleep(self.processing_speed / 3)
+        # Process exit event
+        event = self.get_booth_event(self.current_vehicle, BoothEventType.EXIT)
+        time.sleep(self.get_processing_delay())
         messaging_system.send_message(f"{event}")
-        # logger.info("Publishing exit event: %s", event)
+        logger.info("Publishing exit event: %s", event)
 
         self.current_vehicle = None  # Reset current vehicle after processing
 

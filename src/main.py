@@ -20,9 +20,9 @@ def main():
     num_vehicles = int(os.getenv("NUM_VEHICLE", '0'))
 
     booth11 = Booth("1-1", 
-                    message_publisher_type=message_sender.MessagingSystem.PUBSUB)
+                    message_publisher_type=message_sender.MessagingSystem.RABBITMQ)
     booth12 = Booth("1-2",
-                    message_publisher_type=message_sender.MessagingSystem.PUBSUB)
+                    message_publisher_type=message_sender.MessagingSystem.RABBITMQ)
     plaza1 = TollPlaza(plaza_id=1, booths=[booth11, booth12])
 
     booth21 = Booth("2-1")
