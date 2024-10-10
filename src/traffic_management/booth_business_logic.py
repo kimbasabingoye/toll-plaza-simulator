@@ -128,7 +128,7 @@ class BoothBusinessLogic:
                   booth_event: BoothEventType) -> Dict[str, Any]:
         """ Build and return event dict """
         vehicle_dict = vehicle.to_dict()
-        event = {"event_type": booth_event,
+        event = {"event_type": booth_event.value,
                  "timestamp": datetime.now().isoformat(),
                  "booth_id": self.booth_id}
         event.update(vehicle_dict)

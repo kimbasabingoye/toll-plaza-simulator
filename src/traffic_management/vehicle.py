@@ -1,11 +1,13 @@
 """Vehcile class"""
-
-from dataclasses import dataclass
+import os
 from enum import Enum
 import re
 import random
-from typing import Dict, Any
 
+import pydantic
+
+DEFAULT_PLATE_NUMBER_REGEX = r"^[A-Z]{2} \d{4}$"
+PLATE_NUMBER_REGEX = os.getenv("PLATE_NUMBER_REGEX", DEFAULT_PLATE_NUMBER_REGEX)
 
 class VehicleType(str, Enum):
     """Class representing the different type of vehicles"""
@@ -14,25 +16,22 @@ class VehicleType(str, Enum):
     VAN = "van"
 
 
-class PlateNumber:
+class PlateNumber(pydantic.BaseModel):
     """Class representing a vehicle plate number"""
+    plate_number: str
 
-    def __init__(self, plate_number: str, regex_pattern: str = r"^[A-Z]{2} \d{4}$"):
-        if not self.is_valid(plate_number, regex_pattern):
-            raise ValueError(f"Invalid plate number: {plate_number}")
-        self.plate_number = plate_number
-
-    @staticmethod
-    def is_valid(plate_number: str, regex_pattern: str) -> bool:
-        """Check the validity of a plate number."""
-        return bool(re.match(regex_pattern, plate_number))
+    @pydantic.field_validator('plate_number')
+    @classmethod
+    def check_plate_number(cls, input_plate_number) -> str:
+        """Check the validity of a plate number against the provided regex pattern."""
+        if not re.match(PLATE_NUMBER_REGEX, input_plate_number):
+            raise ValueError(f"Invalid plate number: {input_plate_number}")
+        return input_plate_number
 
     def __str__(self):
         return self.plate_number
 
-
-@dataclass
-class Vehicle:
+class Vehicle(pydantic.BaseModel):
     """
     Class representing a vehicle that enters the toll plaza system.
     """
@@ -43,24 +42,22 @@ class Vehicle:
         """
         Returns a string representation of the vehicle.
         """
-        return (f"Vehicle(plate_number={self.plate_number}, "
-                f"vehicle_type={self.vehicle_type}, ")
+        return (f"Plate Number: {self.plate_number}, "
+                f"Vehicle Type: {self.vehicle_type},")
 
-
-    def to_dict(self) -> Dict[str, Any]:
-        """
-            Returns a dict representation of the vehicle.
-            """
+    def to_dict(self):
+        """Dictionary representation of a vehicle"""
         return {
-            "plate_number": self.plate_number.plate_number,
-            "vehicle_type": self.vehicle_type.value,
+            'pate_number': f"{self.plate_number}",
+            'vehicle_type': self.vehicle_type.value
         }
+
 
 
 class VehicleFactory:
     """Class to create Vehicle"""
     @staticmethod
-    def create_vehicle(plate_number_str: str,
+    def _create_vehicle(plate_number_str: str,
                        vehicle_type: VehicleType) -> Vehicle:
         """
         Factory method to create a Vehicle instance.
@@ -72,7 +69,7 @@ class VehicleFactory:
         Returns:
             Vehicle: An instance of the Vehicle class.
         """
-        plate_number = PlateNumber(plate_number_str)
+        plate_number = PlateNumber(plate_number=plate_number_str)
         return Vehicle(plate_number=plate_number,
                        vehicle_type=vehicle_type,
                     )
@@ -89,4 +86,4 @@ class VehicleFactory:
         plate_numbers = random.randint(1000, 9999)
         plate_number_str = f"{plate_letters} {plate_numbers}"
         vehicle_type = random.choice(list(VehicleType))
-        return VehicleFactory.create_vehicle(plate_number_str, vehicle_type)
+        return VehicleFactory._create_vehicle(plate_number_str, vehicle_type)
