@@ -6,6 +6,7 @@ from traffic_management.booth import Booth
 from traffic_management.traffic_generator import TrafficGenerator
 from toll_plaza_management.toll_plaza import TollPlaza
 from toll_plaza_management.toll_plazas_controller import TollPlazasController
+from messaging import message_sender
 
 
 load_dotenv()
@@ -18,8 +19,10 @@ logger = logging.getLogger(__name__)
 def main():
     num_vehicles = int(os.getenv("NUM_VEHICLE", '0'))
 
-    booth11 = Booth("1-1")
-    booth12 = Booth("1-2")
+    booth11 = Booth("1-1", 
+                    message_publisher_type=message_sender.MessagingSystem.PUBSUB)
+    booth12 = Booth("1-2",
+                    message_publisher_type=message_sender.MessagingSystem.PUBSUB)
     plaza1 = TollPlaza(plaza_id=1, booths=[booth11, booth12])
 
     booth21 = Booth("2-1")

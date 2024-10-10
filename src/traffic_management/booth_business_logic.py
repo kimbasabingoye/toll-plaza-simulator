@@ -2,13 +2,15 @@ import time
 import os
 import enum
 import logging
-from datetime import datetime
+import datetime
 from queue import Queue
-from typing import Dict, Any, Optional
+from typing import Optional
 
 from dotenv import load_dotenv
+import pydantic
 
-from traffic_management.vehicle import Vehicle
+from traffic_management import vehicle
+from messaging import message_sender
 
 load_dotenv()
 
@@ -45,6 +47,22 @@ class BoothQueueState(str, enum.Enum):
     CLOSED = 'closed'
 
 
+class BoothEvent(pydantic.BaseModel):
+    """Processing event at Booth"""
+    booth_id: str
+    vehicle_plate_number: vehicle.PlateNumber
+    vehicle_type: vehicle.VehicleType
+    event_type: BoothEventType
+    timestamp: str
+
+    def __str__(self) -> str:
+        return (f"booth_id: {self.booth_id},"
+                f"vehicle_plate_number: {self.vehicle_plate_number},"
+                f"vehicle_type: {self.vehicle_type},"
+                f"event_type: {self.event_type},"
+                f"timestamp: {self.timestamp})")
+
+
 class BoothBusinessLogic:
     """Represents a booth in a toll plaza."""
 
@@ -63,7 +81,7 @@ class BoothBusinessLogic:
             vehicles.
         """
         self.booth_id = booth_id
-        self.current_vehicle: Optional[Vehicle] = None
+        self.current_vehicle: Optional[vehicle.Vehicle] = None
         self.vehicle_queue = Queue(queue_length)
         self.processing_speed = processing_speed
         self.queue_state = queue_state
@@ -101,7 +119,7 @@ class BoothBusinessLogic:
         logger.info("Booth %s queue is now closed to new vehicles.",
                     self.booth_id)
 
-    def enqueue_vehicle(self, new_vehicle: Vehicle) -> int:
+    def enqueue_vehicle(self, new_vehicle: vehicle.Vehicle) -> int:
         """
         Adds a vehicle to the processing queue of the booth if it's not full 
         and the booth is open.
@@ -124,16 +142,15 @@ class BoothBusinessLogic:
         self.vehicle_queue.put(new_vehicle)
         return AddVehiculeReturnCode.QUEUE_VEHICULE_ADDED
 
-    def get_event(self, vehicle: Vehicle,
-                  booth_event: BoothEventType) -> Dict[str, Any]:
+    def get_booth_event(self, concerned_vehicle: vehicle.Vehicle,
+                        booth_event: BoothEventType) -> BoothEvent:
         """ Build and return event dict """
-        vehicle_dict = vehicle.to_dict()
-        event = {"event_type": booth_event.value,
-                 "timestamp": datetime.now().isoformat(),
-                 "booth_id": self.booth_id}
-        event.update(vehicle_dict)
-
-        return event
+        return BoothEvent(booth_id=self.booth_id,
+                          vehicle_plate_number=concerned_vehicle.plate_number,
+                          vehicle_type=concerned_vehicle.vehicle_type,
+                          event_type=booth_event,
+                          timestamp=datetime.datetime.now().isoformat()
+                          )
 
     def _set_next_vehicle_to_process(self) -> bool:
         """
@@ -149,30 +166,30 @@ class BoothBusinessLogic:
             return True
         return False
 
-    def process_current_vehicle(self) -> bool:
+    def process_current_vehicle(self, messaging_system: message_sender.MessageSender) -> bool:
         """Simulate processing the curent vehicle."""
         if self.current_vehicle is None:
-            logger.info("No vehicle no process")
+            logger.info("No vehicle to process")
             return False
 
-        entrance_message = self.get_event(
+        event = self.get_booth_event(
             self.current_vehicle, BoothEventType.ENTER)
         time.sleep(self.processing_speed / 3)
-        logger.info("Publishing entrance event: %s",
-                    entrance_message)
+        messaging_system.send_message(f"{event}")
+        # logger.info("Publishing entrance event: %s", entrance_message)
 
-        payment_message = self.get_event(
+        event = self.get_booth_event(
             self.current_vehicle, BoothEventType.PAY)
         time.sleep(self.processing_speed / 3)
-        logger.info("Publishing payment event: %s",
-                    payment_message)
+        messaging_system.send_message(f"{event}")
+        # logger.info("Publishing payment event: %s", payment_message)
 
-        exit_message = self.get_event(
+        event = self.get_booth_event(
             self.current_vehicle, BoothEventType.EXIT)
         time.sleep(self.processing_speed / 3)
-        logger.info("Publishing exit event: %s", exit_message)
+        messaging_system.send_message(f"{event}")
+        # logger.info("Publishing exit event: %s", event)
 
         self.current_vehicle = None  # Reset current vehicle after processing
 
         return True
-

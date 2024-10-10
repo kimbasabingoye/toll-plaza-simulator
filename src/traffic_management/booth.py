@@ -10,6 +10,7 @@ from traffic_management.booth_business_logic import (
     BoothBusinessLogic, BoothState, AddVehiculeReturnCode,
     BoothQueueState)
 from traffic_management.vehicle import Vehicle
+from messaging import message_sender
 
 load_dotenv()
 
@@ -22,10 +23,13 @@ VEHICLE_PROCESSING_SLEEP_TIME = float(os.getenv(
 class Booth(BoothBusinessLogic):
     """Class representing booth"""
 
-    def __init__(self, booth_id: str, processing_speed: int = 1):
+    def __init__(self, booth_id: str,
+                 processing_speed: int = 1,
+                 message_publisher_type: message_sender.MessagingSystem = message_sender.MessagingSystem.STDOUT):
         super().__init__(booth_id, processing_speed)
         self.thread: Optional[threading.Thread] = None
         self.state: BoothState = BoothState.STOPPED
+        self.message_sender = message_sender.MessageSender(message_publisher_type)
 
     def is_running(self):
         """Returns True if the booth is running and False otherwise"""
@@ -111,12 +115,9 @@ class Booth(BoothBusinessLogic):
                 break
 
             if self._set_next_vehicle_to_process():
-                self.process_current_vehicle()
+                self.process_current_vehicle(self.message_sender)
                 time.sleep(VEHICLE_PROCESSING_SLEEP_TIME)
             else:
                 logger.info(
                     "Booth %s is idle. No vehicles to process.", self.booth_id)
                 time.sleep(1)  # Wait before checking again
-
-
-
